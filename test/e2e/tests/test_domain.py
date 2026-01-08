@@ -17,9 +17,9 @@
 from dataclasses import dataclass, field
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.tz import tzlocal, tzutc
-from typing import Dict
+from typing import Dict, Optional
 
 from acktest.resources import random_suffix_name
 from acktest.k8s import resource as k8s
@@ -57,8 +57,9 @@ class Domain:
     master_node_count: int = 0
     is_zone_aware: bool = False
     is_vpc: bool = False
-    vpc_id: str = None
+    vpc_id: Optional[str] = None
     vpc_subnets: list = field(default_factory=list)
+    autotune_start_at: Optional[datetime] = None
 
 
 @pytest.fixture(scope="module")
@@ -68,7 +69,8 @@ def resources():
 
 @pytest.fixture
 def es_7_9_domain(os_client, resources: BootstrapResources):
-    resource = Domain(name=random_suffix_name("my-os-domain1", 20), data_node_count=1)
+    tomorrow = (datetime.now(tzutc()).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+    resource = Domain(name=random_suffix_name("my-os-domain1", 20), data_node_count=1, autotune_start_at=tomorrow)
     mup = resources.MasterUserPasswordSecret
 
     replacements = REPLACEMENT_VALUES.copy()
@@ -76,6 +78,7 @@ def es_7_9_domain(os_client, resources: BootstrapResources):
     replacements["MASTER_USER_PASS_SECRET_NAMESPACE"] = mup.ns
     replacements["MASTER_USER_PASS_SECRET_NAME"] = mup.name
     replacements["MASTER_USER_PASS_SECRET_KEY"] = mup.key
+    replacements["AUTO_TUNE_START_AT"] = tomorrow.isoformat()
 
     resource_data = load_opensearch_resource(
         "domain_es7.9",
@@ -237,7 +240,7 @@ class TestDomain:
         assert latest['DomainStatus']['ClusterConfig']['ZoneAwarenessEnabled'] == resource.is_zone_aware
 
         latest_config = domain.get_config(resource.name)
-        assert latest_config['DomainConfig']['AutoTuneOptions']['Options']['MaintenanceSchedules'][0]['StartAt'] == datetime(2025, 12, 15, 0, 0, tzinfo=tzlocal())
+        assert latest_config['DomainConfig']['AutoTuneOptions']['Options']['MaintenanceSchedules'][0]['StartAt'] == resource.autotune_start_at
 
         time.sleep(CHECK_ENDPOINT_WAIT_SECONDS)
 
