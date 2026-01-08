@@ -17,16 +17,15 @@ package domain
 
 import (
 	"bytes"
-	"reflect"
 
 	ackcompare "github.com/aws-controllers-k8s/runtime/pkg/compare"
 	acktags "github.com/aws-controllers-k8s/runtime/pkg/tags"
+	"k8s.io/apimachinery/pkg/api/equality"
 )
 
 // Hack to avoid import errors during build...
 var (
 	_ = &bytes.Buffer{}
-	_ = &reflect.Method{}
 	_ = &acktags.Tags{}
 )
 
@@ -478,7 +477,7 @@ func newResourceDelta(
 	if len(a.ko.Spec.LogPublishingOptions) != len(b.ko.Spec.LogPublishingOptions) {
 		delta.Add("Spec.LogPublishingOptions", a.ko.Spec.LogPublishingOptions, b.ko.Spec.LogPublishingOptions)
 	} else if len(a.ko.Spec.LogPublishingOptions) > 0 {
-		if !reflect.DeepEqual(a.ko.Spec.LogPublishingOptions, b.ko.Spec.LogPublishingOptions) {
+		if !equality.Semantic.Equalities.DeepEqual(a.ko.Spec.LogPublishingOptions, b.ko.Spec.LogPublishingOptions) {
 			delta.Add("Spec.LogPublishingOptions", a.ko.Spec.LogPublishingOptions, b.ko.Spec.LogPublishingOptions)
 		}
 	}
