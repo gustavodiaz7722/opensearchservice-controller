@@ -23,6 +23,7 @@ from typing import Dict, Optional
 
 from acktest.resources import random_suffix_name
 from acktest.k8s import resource as k8s
+from acktest import tags
 import pytest
 
 from e2e import condition
@@ -362,6 +363,7 @@ class TestDomain:
         
     def test_create_delete_tags_es_7_9(self, es_7_9_domain):
         ref, resource = es_7_9_domain
+        modify_wait_after_seconds = 5
 
         latest = domain.get(resource.name)
 
@@ -393,18 +395,23 @@ class TestDomain:
         }
         k8s.patch_custom_resource(ref, updates)
 
-        # wait for 15 minutes, it's always going to take at least this long
-        time.sleep(MODIFY_WAIT_AFTER_SECONDS)
+        time.sleep(modify_wait_after_seconds)
         
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
         
-        latest = domain.get(resource.name)
-        assert latest is not None
         domain_arn = latest['DomainStatus']['ARN']
         tags = domain.list_tags(domain_arn)
-        assert {'Key': 'new-tag-key', 'Value': 'new-tag-value-1'} in tags['TagList']
-        assert {'Key': 'new-tag-key', 'Value': 'new-tag-value-2'} not in tags['TagList']
         
+        updated_tags = {
+            "new-tag-key": "new-tag-value-1"
+        }
+        tags.assert_ack_system_tags(
+            tags=tags["TagList"],
+        )
+        tags.assert_equal_without_ack_tags(
+            expected=updated_tags,
+            actual=tags["TagList"],
+        )
         
         updates = {
             "spec": {
@@ -418,40 +425,45 @@ class TestDomain:
         }
         k8s.patch_custom_resource(ref, updates)
 
-        # wait for 15 minutes, it's always going to take at least this long
-        time.sleep(MODIFY_WAIT_AFTER_SECONDS)
-        
+        time.sleep(modify_wait_after_seconds)        
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
         
-        latest = domain.get(resource.name)
-        assert latest is not None
         domain_arn = latest['DomainStatus']['ARN']
         tags = domain.list_tags(domain_arn)
-        assert {'Key': 'new-tag-key', 'Value': 'new-tag-value-1'} not in tags['TagList']
-        assert {'Key': 'new-tag-key', 'Value': 'new-tag-value-2'} in tags['TagList']
+        
+        updated_tags = {
+            "new-tag-key": "new-tag-value-2"
+        }
+        tags.assert_ack_system_tags(
+            tags=tags["TagList"],
+        )
+        tags.assert_equal_without_ack_tags(
+            expected=updated_tags,
+            actual=tags["TagList"],
+        )
 
         
         updates = {
             "spec": {
-                "tags": [
-                    {
-                        "key": "new-tag-key",
-                        "value": "new-tag-value-2"
-                    }
-                ]
+                "tags": []
             }
         }
         k8s.patch_custom_resource(ref, updates)
 
-        # wait for 15 minutes, it's always going to take at least this long
-        time.sleep(MODIFY_WAIT_AFTER_SECONDS)
+        time.sleep(modify_wait_after_seconds)
         
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
         
-        latest = domain.get(resource.name)
-        assert latest is not None
         domain_arn = latest['DomainStatus']['ARN']
         tags = domain.list_tags(domain_arn)
-        assert {'Key': 'new-tag-key', 'Value': 'new-tag-value-1'} not in tags['TagList']
-        assert {'Key': 'new-tag-key', 'Value': 'new-tag-value-2'} not in tags['TagList']
+        
+        updated_tags = {}
+        tags.assert_ack_system_tags(
+            tags=tags["TagList"],
+        )
+        tags.assert_equal_without_ack_tags(
+            expected=updated_tags,
+            actual=tags["TagList"],
+        )
+
 
