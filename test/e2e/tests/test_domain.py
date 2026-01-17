@@ -400,17 +400,17 @@ class TestDomain:
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
         
         domain_arn = latest['DomainStatus']['ARN']
-        tags = domain.list_tags(domain_arn)
+        latest_tags = domain.list_tags(domain_arn)["TagList"]
         
         updated_tags = {
             "new-tag-key": "new-tag-value-1"
         }
         tags.assert_ack_system_tags(
-            tags=tags["TagList"],
+            tags=latest_tags,
         )
         tags.assert_equal_without_ack_tags(
             expected=updated_tags,
-            actual=tags["TagList"],
+            actual=latest_tags,
         )
         
         updates = {
@@ -429,17 +429,17 @@ class TestDomain:
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
         
         domain_arn = latest['DomainStatus']['ARN']
-        tags = domain.list_tags(domain_arn)
+        latest_tags = domain.list_tags(domain_arn)["TagList"]
         
         updated_tags = {
             "new-tag-key": "new-tag-value-2"
         }
         tags.assert_ack_system_tags(
-            tags=tags["TagList"],
+            tags=latest_tags,
         )
         tags.assert_equal_without_ack_tags(
             expected=updated_tags,
-            actual=tags["TagList"],
+            actual=latest_tags,
         )
 
         
@@ -455,15 +455,15 @@ class TestDomain:
         assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
         
         domain_arn = latest['DomainStatus']['ARN']
-        tags = domain.list_tags(domain_arn)
+        latest_tags = domain.list_tags(domain_arn)["TagList"]
         
         updated_tags = {}
         tags.assert_ack_system_tags(
-            tags=tags["TagList"],
+            tags=latest_tags,
         )
         tags.assert_equal_without_ack_tags(
             expected=updated_tags,
-            actual=tags["TagList"],
+            actual=latest_tags,
         )
 
 
