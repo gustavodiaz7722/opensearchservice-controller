@@ -31,6 +31,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	svcapitypes "github.com/aws-controllers-k8s/opensearchservice-controller/apis/v1alpha1"
+	"github.com/aws-controllers-k8s/opensearchservice-controller/pkg/sync"
 )
 
 var (
@@ -39,6 +40,9 @@ var (
 		ackrequeue.DefaultRequeueAfterDuration,
 	)
 )
+
+var syncTags = sync.Tags
+var getTags = sync.GetTags
 
 func customPreCompare(delta *ackcompare.Delta, a *resource, b *resource) {
 	if a.ko.Spec.AutoTuneOptions != nil && b.ko.Spec.AutoTuneOptions != nil {
@@ -200,6 +204,22 @@ func (rm *resourceManager) customUpdateDomain(ctx context.Context, desired, late
 		// the resource. No need to return a requeue error here.
 		ackcondition.SetSynced(r, corev1.ConditionFalse, nil, nil)
 		return r, nil
+	}
+
+	if delta.DifferentAt("Spec.Tags") {
+		arn := string(*latest.ko.Status.ACKResourceMetadata.ARN)
+		err = syncTags(
+			ctx,
+			desired.ko.Spec.Tags, latest.ko.Spec.Tags,
+			&arn, convertToOrderedACKTags, rm.sdkapi, rm.metrics,
+		)
+		if err != nil {
+			return desired, err
+		}
+	}
+
+	if !delta.DifferentExcept("Spec.Tags") {
+		return desired, nil
 	}
 
 	input, err := rm.newCustomUpdateRequestPayload(ctx, desired, latest, delta)

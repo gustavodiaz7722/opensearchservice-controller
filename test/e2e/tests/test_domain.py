@@ -23,6 +23,7 @@ from typing import Dict, Optional
 
 from acktest.resources import random_suffix_name
 from acktest.k8s import resource as k8s
+from acktest import tags
 import pytest
 
 from e2e import condition
@@ -359,3 +360,110 @@ class TestDomain:
         assert cr is not None
         assert 'status' in cr
         domain.assert_endpoints(cr)
+        
+    def test_create_delete_tags_es_7_9(self, es_7_9_domain):
+        ref, resource = es_7_9_domain
+        modify_wait_after_seconds = 5
+
+        latest = domain.get(resource.name)
+
+        assert latest['DomainStatus']['EngineVersion'] == 'Elasticsearch_7.9'
+        assert latest['DomainStatus']['Created'] is True
+        assert latest['DomainStatus']['ClusterConfig']['InstanceCount'] == resource.data_node_count
+        assert latest['DomainStatus']['ClusterConfig']['ZoneAwarenessEnabled'] == resource.is_zone_aware
+
+        latest_config = domain.get_config(resource.name)
+        assert latest_config['DomainConfig']['AutoTuneOptions']['Options']['MaintenanceSchedules'][0]['StartAt'] == resource.autotune_start_at
+
+        time.sleep(CHECK_ENDPOINT_WAIT_SECONDS)
+
+        cr = k8s.get_resource(ref)
+        assert cr is not None
+        assert 'status' in cr
+        domain.assert_endpoint(cr)
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=30)
+
+        updates = {
+            "spec": {
+                "tags": [
+                    {
+                        "key": "new-tag-key",
+                        "value": "new-tag-value-1"
+                    }
+                ]
+            }
+        }
+        k8s.patch_custom_resource(ref, updates)
+
+        time.sleep(modify_wait_after_seconds)
+        
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
+        
+        domain_arn = latest['DomainStatus']['ARN']
+        latest_tags = domain.list_tags(domain_arn)["TagList"]
+        
+        updated_tags = {
+            "new-tag-key": "new-tag-value-1"
+        }
+        tags.assert_ack_system_tags(
+            tags=latest_tags,
+        )
+        tags.assert_equal_without_ack_tags(
+            expected=updated_tags,
+            actual=latest_tags,
+        )
+        
+        updates = {
+            "spec": {
+                "tags": [
+                    {
+                        "key": "new-tag-key",
+                        "value": "new-tag-value-2"
+                    }
+                ]
+            }
+        }
+        k8s.patch_custom_resource(ref, updates)
+
+        time.sleep(modify_wait_after_seconds)        
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
+        
+        domain_arn = latest['DomainStatus']['ARN']
+        latest_tags = domain.list_tags(domain_arn)["TagList"]
+        
+        updated_tags = {
+            "new-tag-key": "new-tag-value-2"
+        }
+        tags.assert_ack_system_tags(
+            tags=latest_tags,
+        )
+        tags.assert_equal_without_ack_tags(
+            expected=updated_tags,
+            actual=latest_tags,
+        )
+
+        
+        updates = {
+            "spec": {
+                "tags": []
+            }
+        }
+        k8s.patch_custom_resource(ref, updates)
+
+        time.sleep(modify_wait_after_seconds)
+        
+        assert k8s.wait_on_condition(ref, "ACK.ResourceSynced", "True", wait_periods=10)
+        
+        domain_arn = latest['DomainStatus']['ARN']
+        latest_tags = domain.list_tags(domain_arn)["TagList"]
+        
+        updated_tags = {}
+        tags.assert_ack_system_tags(
+            tags=latest_tags,
+        )
+        tags.assert_equal_without_ack_tags(
+            expected=updated_tags,
+            actual=latest_tags,
+        )
+
+

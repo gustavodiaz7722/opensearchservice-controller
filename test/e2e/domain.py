@@ -138,6 +138,19 @@ def get_config(domain_name):
         return resp
     except c.exceptions.ResourceNotFoundException:
         return None
+      
+def list_tags(domain_arn):
+    """Returns a dict containing the tags for the domain from the OpenSearch API.
+
+    if no such domain exists, returns None.
+    """
+    c = boto3.client('opensearch')
+    try:
+        resp = c.list_tags(ARN=domain_arn)
+        assert 'TagList' in resp
+        return resp
+    except c.exceptions.ResourceNotFoundException:
+        return None
     
 
 # Apparently, there is an 'endpoint' and an 'endpoints' field for a domain.
